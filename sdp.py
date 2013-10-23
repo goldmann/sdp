@@ -17,7 +17,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from gi.repository import Gtk, GdkPixbuf, GObject
+from gi.repository import Gtk, Gdk, GdkPixbuf, GObject
 import threading
 import time
 import sched
@@ -45,11 +45,15 @@ class MainWindow:
 
     self.client = soundcloud.Client(client_id="fddd281b41e49cbfef36d3319532ac9c")
 
-    window = self.builder.get_object("window_sdp")
+    window = self.builder.get_object("window_main")
     window.show_all()
 
 #  def on_gst_message(self, bus, message):
 #    print message.type
+
+  def on_window_key_press_event(self, window, key):
+    if key.keyval == Gdk.KEY_s and key.state == Gdk.ModifierType.CONTROL_MASK:
+      self.builder.get_object("search_song").grab_focus()
 
   def search(self, term=""):
     self.tracks = self.client.get('/tracks', limit=15, q=term, filter="streamable")
