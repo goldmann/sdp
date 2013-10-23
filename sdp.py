@@ -18,7 +18,6 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from gi.repository import Gtk, GdkPixbuf, GObject
-#from gi.repository import Gst as gst
 import threading
 import time
 import sched
@@ -26,10 +25,7 @@ import urllib2
 import gst
 import datetime
 from threading import Timer
-#import gobject
 
-#import pyglet
-#import pygst
 import soundcloud
 
 class MainWindow:
@@ -69,41 +65,9 @@ class MainWindow:
   def on_search_song_activate(self, search_entry):
       self.search(search_entry.get_text())
 
-#  def on_window_key_release_event(self, widget, event):
-#      return True
-#      print event.keyval
-
   def on_window_destroy(self, a):
       self.player.set_state(gst.STATE_NULL)
       Gtk.main_quit()
-
-  def on_btn_play_toggled(self, button):
-      if (button.get_active()):
-        self.player.set_state(gst.STATE_PLAYING)
-      else:
-        self.player.set_state(gst.STATE_PAUSED)
-
-  def on_btn_stop_clicked(self, button):
-      self.player.set_state(gst.STATE_NULL)
-      self.reset_playing()
-
-  def on_btn_next_clicked(self, button):
-      if (self.current_track_id == None):
-        n_id = 0
-      else:
-        n_id = self.current_track_id+1
-
-      tv_songs = self.builder.get_object("tv_songs")
-      #path, col = tv_songs.get_cursor()
-      #tv_songs.get_model().next()
-      selection = tv_songs.get_selection()
-#      path = Gtk.TreePath.new_first()
-      #path = Gtk.TreePath.new_from_string(str(n_id))
-      #selection.select_path(path)
-
-      tv_songs.set_cursor(n_id, 0)
-      path, col = tv_songs.get_cursor()
-      tv_songs.row_activated(path, col)
 
   def reset_image(self):
       self.builder.get_object("image1").set_from_file("soundcloud_logo_small.png")
@@ -111,7 +75,6 @@ class MainWindow:
   def reset_playing(self):
       self.builder.get_object("l_artist").set_text("")
       self.builder.get_object("l_title").set_text("")
-
 
   def on_songs_row_activated(self, treeview, row_id, column):
       (model, i) = treeview.get_selection().get_selected()
@@ -210,9 +173,6 @@ class MainWindow:
       time.sleep(1)
   #    self.update_time()
 
-#      scheduler.enter(1, 1, self.update_time, (scheduler,))
-
-#builder.connect_signals(Handler())
 
 
 GObject.threads_init()
