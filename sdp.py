@@ -17,7 +17,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from gi.repository import Gtk, Gdk, GdkPixbuf, GObject
+from gi.repository import Gtk, Gdk, GLib, GdkPixbuf, GObject
 import logging
 import threading
 import time
@@ -135,40 +135,22 @@ class MainWindow:
 
       if (track.artwork_url != None):
         self.log.debug("Yes it does, will update the image")
-       # print "getting artwork " + track.artwork_url
       
-        #th = threading.Thread(target=self.update_from_thread)
-        th_img = threading.Thread(target=self.update_from_thread,args=(track.artwork_url,))
-        #th_img.daemon = True
+        th_img = threading.Thread(target=self.get_image,args=(track.artwork_url,))
         th_img.start()
       else:
         self.log.debug("No artwork this time")
         self.reset_image()
 
       th_play = threading.Thread(target=self.play,args=(track_id,))
-      th_play.daemon = True
       th_play.start()
 
-#      Timer(0.5, self.update_time).start()
-
-#      s = sched.scheduler(time.time, time.sleep)
-#      s.enter(60, 1, self.update_time, (s,))
-
-#      th_st = threading.Thread(target=self.update_time)
-#      th_st.daemon = True
-#      th_st.start()
-#      s.run()
-
-
-  def update_from_thread(self, url):
-      #print url
+  def get_image(self, url):
       response = urllib2.urlopen(url).read()
-      #print len(response)
       l = GdkPixbuf.PixbufLoader.new_with_type('jpeg')
       l.write(response)
       l.close()
-
-      self.builder.get_object("image1").set_from_pixbuf(l.get_pixbuf())
+      GObject.idle_add(self.update_image, l.get_pixbuf())
 
   def play(self, track_id):
       self.current_track_id = track_id
@@ -187,27 +169,12 @@ class MainWindow:
   
       self.update_time()
 
-      #self.builder.get_object("btn_play").set_active(True)
+  def update_image(self, pixbuf):
+      self.builder.get_object("image1").set_from_pixbuf(pixbuf)
 
-      #self.builder.get_object("label1").set_text(self.tracks[row_id].title)
-      #print self.tracks[row_id]
 
-      #for path in pathlist:
-      #  tree_iter = model.get_iter(path)
-      #  value = model.get_value(tree_iter, 0)
-        #open_(value)
-      #  print value.duration
-
-      #  self.scale_position.set_range(0, value.duration)
-        
-       # if (value.artwork_url != None):
-       #   print "getting artwork"
-       #   response = urllib2.urlopen(value.artwork_url).read()
-       #   print response.__class__.__name__
-       #   Pixbuf.new_from_data(response, GdkPixbuf.Colorspace.RGB, False, 70, 100, 100, 0, None, None)
-
-          #Pixbuf.new_fromi_file(response
-      
+  def update_label(self, delta):
+      self.builder.get_object("l_length").set_text(str(delta))
 
   def update_time(self):
     format = gst.Format(gst.FORMAT_TIME)
@@ -218,13 +185,16 @@ class MainWindow:
       duration = self.player.query_position(format)[0]
 
       delta = datetime.timedelta(seconds=(duration / gst.SECOND))
-      #self.builder.get_object("l_length").set_text(str(delta))
+  
+      GObject.idle_add(self.update_label, delta)
 
       time.sleep(0.1)
-  #    self.update_time()
-
-
 
 GObject.threads_init()
+#Gdk.threads_init()
 MainWindow()
+#GLib.threads_init()
+#Gdk.threads_init()
+Gdk.threads_enter()
 Gtk.main()
+Gdk.threads_leave()
