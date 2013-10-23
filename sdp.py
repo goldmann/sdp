@@ -52,16 +52,17 @@ class MainWindow:
 #    print message.type
 
   def on_window_key_press_event(self, window, key):
-    # Play/pause
-    if key.keyval == Gdk.KEY_space and key.state == Gdk.ModifierType.CONTROL_MASK:
-      if self.player.get_state()[1] == gst.STATE_PAUSED:
-        self.player.set_state(gst.STATE_PLAYING)
-      else:
-        self.player.set_state(gst.STATE_PAUSED)
+    if key.state == Gdk.ModifierType.CONTROL_MASK:
+      # Play/pause
+      if key.keyval == Gdk.KEY_space:
+        if self.player.get_state()[1] == gst.STATE_PAUSED:
+          self.player.set_state(gst.STATE_PLAYING)
+        else:
+          self.player.set_state(gst.STATE_PAUSED)
 
-    # Focus on search
-    if key.keyval == Gdk.KEY_s and key.state == Gdk.ModifierType.CONTROL_MASK:
-      self.builder.get_object("search_song").grab_focus()
+      # Focus on search
+      if key.keyval == Gdk.KEY_s:
+        self.builder.get_object("search_song").grab_focus()
 
   def search(self, term=""):
     self.tracks = self.client.get('/tracks', limit=15, q=term, filter="streamable")
