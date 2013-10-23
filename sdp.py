@@ -26,6 +26,7 @@ import urllib2
 import gst
 import datetime
 import sys
+import gobject as g
 from threading import Timer
 
 import soundcloud
@@ -48,14 +49,19 @@ class MainWindow:
     self.player = gst.element_factory_make("playbin", "player")
     self.log.debug("GStreamer player ready")
 
+    self.current_iter = None
+    self.current_track_id = None
+
     # Start watching for GST signals
 #    bus = self.player.get_bus()
 #    bus.add_signal_watch()
 #    bus.connect("message", self.on_gst_message)
 
-    self.current_track_id = None
 
     self.client = soundcloud.Client(client_id="fddd281b41e49cbfef36d3319532ac9c")
+
+    self.treeview = self.builder.get_object("tv_songs")
+    self.model = self.treeview.get_model()
 
     window = self.builder.get_object("window_main")
     window.show_all()
@@ -74,11 +80,15 @@ class MainWindow:
 
       # Next song
       elif key.keyval == Gdk.KEY_rightarrow or key.keyval == 65363:
-        print "Next"
+        i = self.model.iter_next(self.current_iter)
+        tp = self.model.get_path(i)
+        self.treeview.row_activated(tp, self.builder.get_object("treeviewcolumn1"))
 
       # Prev song
       elif key.keyval == Gdk.KEY_leftarrow or key.keyval == 65361:
-        print "Prev"
+        i = self.model.iter_previous(self.current_iter)
+        tp = self.model.get_path(i)
+        self.treeview.row_activated(tp, self.builder.get_object("treeviewcolumn1"))
 
       # Focus on search
       elif key.keyval == Gdk.KEY_s:
@@ -87,12 +97,11 @@ class MainWindow:
   def search(self, term=""):
     self.tracks = self.client.get('/tracks', limit=15, q=term, filter="streamable")
 
-    liststore1 = self.builder.get_object("liststore1")
-    liststore1.clear()
+    self.model.clear()
 
     i = 0
     for t in self.tracks:
-      liststore1.append([i, t.title, t.permalink_url])
+      self.model.append([i, t.title, t.permalink_url])
       i+=1
 
   def on_search_song_activate(self, search_entry):
@@ -109,14 +118,18 @@ class MainWindow:
       self.builder.get_object("l_artist").set_text("")
       self.builder.get_object("l_title").set_text("")
 
-  def on_songs_row_activated(self, treeview, row_id, column):
-      (model, i) = treeview.get_selection().get_selected()
+  def on_songs_row_activated(self, treeview, path, column):
+      model = treeview.get_model()
+      i = model.get_iter(path)
+      self.current_iter = i
 
       track_id = model.get_value(i, 0)
       track = self.tracks[track_id]
 
-      self.builder.get_object("l_title").set_markup("<span size=\"large\" font_weight=\"bold\">" + track.title + "</span>")
-      self.builder.get_object("l_artist").set_markup("<span size=\"large\">" + track.user['username'] + "</span>")
+      self.log.debug("Preparing to play track '" + track.title + "' by '" + track.user['username'] + "'")
+
+      self.builder.get_object("l_title").set_markup("<span size=\"large\" font_weight=\"bold\">" + g.markup_escape_text(track.title) + "</span>")
+      self.builder.get_object("l_artist").set_markup("<span size=\"large\">" + g.markup_escape_text(track.user['username']) + "</span>")
 
       self.log.debug("Checking if track contains artwork...")
 
