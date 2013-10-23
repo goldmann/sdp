@@ -142,8 +142,16 @@ class MainWindow:
 
       self.player.set_state(gst.STATE_NULL)
       self.player.set_property('uri', url.location)
-      self.player.set_state(gst.STATE_PLAYING)
+      # Pause for now, so we can prepare to retrieve the state later
+      self.player.set_state(gst.STATE_PAUSED)
 
+      correct_states = [gst.STATE_PLAYING, gst.STATE_PAUSED]
+      while (self.player.get_state()[1] not in correct_states):
+        time.sleep(0.1)
+
+      self.player.set_state(gst.STATE_PLAYING)
+  
+      self.update_time()
 
       #self.builder.get_object("btn_play").set_active(True)
 
@@ -168,22 +176,17 @@ class MainWindow:
       
 
   def update_time(self):
-    correct_states = [gst.STATE_PLAYING, gst.STATE_PAUSED]
     format = gst.Format(gst.FORMAT_TIME)
 
     self.builder.get_object("l_length").set_text(str(datetime.timedelta(seconds=(0 / gst.SECOND))))
 
     while True:
-
-      while (self.player.get_state()[1] not in correct_states):
-        time.sleep(0.1)
-    
       duration = self.player.query_position(format)[0]
 
       delta = datetime.timedelta(seconds=(duration / gst.SECOND))
       self.builder.get_object("l_length").set_text(str(delta))
 
-      time.sleep(1)
+      time.sleep(0.1)
   #    self.update_time()
 
 
