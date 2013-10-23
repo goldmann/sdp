@@ -18,23 +18,35 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from gi.repository import Gtk, Gdk, GdkPixbuf, GObject
+import logging
 import threading
 import time
 import sched
 import urllib2
 import gst
 import datetime
+import sys
 from threading import Timer
 
 import soundcloud
 
 class MainWindow:
   def __init__(self):
+    self.log = logging.getLogger(self.__class__.__name__)
+
+    ch = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    self.log.addHandler(ch)
+    self.log.setLevel(logging.DEBUG)
+
     self.builder = Gtk.Builder()
     self.builder.add_from_file("sdp.glade")
     self.builder.connect_signals(self)
 
+    self.log.debug("Initializing GStreamer player...")
     self.player = gst.element_factory_make("playbin", "player")
+    self.log.debug("GStreamer player ready")
 
     # Start watching for GST signals
 #    bus = self.player.get_bus()
@@ -60,8 +72,16 @@ class MainWindow:
         else:
           self.player.set_state(gst.STATE_PAUSED)
 
+      # Next song
+      elif key.keyval == Gdk.KEY_rightarrow or key.keyval == 65363:
+        print "Next"
+
+      # Prev song
+      elif key.keyval == Gdk.KEY_leftarrow or key.keyval == 65361:
+        print "Prev"
+
       # Focus on search
-      if key.keyval == Gdk.KEY_s:
+      elif key.keyval == Gdk.KEY_s:
         self.builder.get_object("search_song").grab_focus()
 
   def search(self, term=""):
@@ -98,9 +118,10 @@ class MainWindow:
       self.builder.get_object("l_title").set_markup("<span size=\"large\" font_weight=\"bold\">" + track.title + "</span>")
       self.builder.get_object("l_artist").set_markup("<span size=\"large\">" + track.user['username'] + "</span>")
 
-      print "streamable: " + str(track.streamable)
+      self.log.debug("Checking if track contains artwork...")
 
       if (track.artwork_url != None):
+        self.log.debug("Yes it does, will update the image")
        # print "getting artwork " + track.artwork_url
       
         #th = threading.Thread(target=self.update_from_thread)
@@ -108,6 +129,7 @@ class MainWindow:
         #th_img.daemon = True
         th_img.start()
       else:
+        self.log.debug("No artwork this time")
         self.reset_image()
 
       th_play = threading.Thread(target=self.play,args=(track_id,))
@@ -138,7 +160,6 @@ class MainWindow:
   def play(self, track_id):
       self.current_track_id = track_id
       url = self.client.get(self.tracks[track_id].stream_url, allow_redirects=False)
-      print url.location
 
       self.player.set_state(gst.STATE_NULL)
       self.player.set_property('uri', url.location)
@@ -184,7 +205,7 @@ class MainWindow:
       duration = self.player.query_position(format)[0]
 
       delta = datetime.timedelta(seconds=(duration / gst.SECOND))
-      self.builder.get_object("l_length").set_text(str(delta))
+      #self.builder.get_object("l_length").set_text(str(delta))
 
       time.sleep(0.1)
   #    self.update_time()
