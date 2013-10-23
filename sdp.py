@@ -29,7 +29,7 @@ import sys
 import gobject as g
 from threading import Timer
 
-import soundcloud
+from client import SoundCloud
 
 class MainWindow:
   def __init__(self):
@@ -58,7 +58,7 @@ class MainWindow:
 #    bus.connect("message", self.on_gst_message)
 
 
-    self.client = soundcloud.Client(client_id="fddd281b41e49cbfef36d3319532ac9c")
+    self.sc = SoundCloud()
 
     self.treeview = self.builder.get_object("tv_songs")
     self.model = self.treeview.get_model()
@@ -95,7 +95,7 @@ class MainWindow:
         self.builder.get_object("search_song").grab_focus()
 
   def search(self, term=""):
-    self.tracks = self.client.get('/tracks', limit=15, q=term, filter="streamable")
+    self.tracks = self.sc.tracks(term)
 
     self.model.clear()
 
@@ -112,7 +112,7 @@ class MainWindow:
       Gtk.main_quit()
 
   def reset_image(self):
-      self.builder.get_object("image1").set_from_file("soundcloud_logo_small.png")
+      self.builder.get_object("image1").set_from_file("images/soundcloud_logo_small.png")
 
   def reset_playing(self):
       self.builder.get_object("l_artist").set_text("")
@@ -154,7 +154,7 @@ class MainWindow:
 
   def play(self, track_id):
       self.current_track_id = track_id
-      url = self.client.get(self.tracks[track_id].stream_url, allow_redirects=False)
+      url = self.sc.client.get(self.tracks[track_id].stream_url, allow_redirects=False)
 
       self.player.set_state(gst.STATE_NULL)
       self.player.set_property('uri', url.location)
@@ -162,6 +162,7 @@ class MainWindow:
       self.player.set_state(gst.STATE_PAUSED)
 
       correct_states = [gst.STATE_PLAYING, gst.STATE_PAUSED]
+
       while (self.player.get_state()[1] not in correct_states):
         time.sleep(0.1)
 
@@ -172,7 +173,6 @@ class MainWindow:
   def update_image(self, pixbuf):
       self.builder.get_object("image1").set_from_pixbuf(pixbuf)
 
-
   def update_label(self, delta):
       self.builder.get_object("l_length").set_text(str(delta))
 
@@ -182,7 +182,11 @@ class MainWindow:
     self.builder.get_object("l_length").set_text(str(datetime.timedelta(seconds=(0 / gst.SECOND))))
 
     while True:
-      duration = self.player.query_position(format)[0]
+      try:
+        duration = self.player.query_position(format)[0]
+      except Exception as e:
+        # Whatever, it's expected
+        break
 
       delta = datetime.timedelta(seconds=(duration / gst.SECOND))
   
