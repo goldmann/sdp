@@ -17,13 +17,12 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from gi.repository import Gtk, Gdk, GLib, GdkPixbuf, GObject
+from gi.repository import Gtk, Gdk, Gst, GLib, GdkPixbuf, GObject
 import logging
 import threading
 import time
 import sched
 import urllib2
-import gst
 import datetime
 import sys
 import gobject as g
@@ -46,17 +45,22 @@ class MainWindow:
     self.builder.connect_signals(self)
 
     self.log.debug("Initializing GStreamer player...")
-    self.player = gst.element_factory_make("playbin", "player")
+    self.playbin = Gst.ElementFactory.make("playbin", "player")
     self.log.debug("GStreamer player ready")
 
     self.current_iter = None
     self.current_track_id = None
 
-    # Start watching for GST signals
-#    bus = self.player.get_bus()
-#    bus.add_signal_watch()
-#    bus.connect("message", self.on_gst_message)
+    self.pipeline = Gst.Pipeline()
 
+    self.bus = self.pipeline.get_bus()
+    self.bus.add_signal_watch()
+#    self.bus.connect('message', self.on_gst_message)
+#    self.bus.connect('message::error', self.on_error)
+    self.bus.connect('message::eos', self.on_eos)
+
+    self.pipeline.add(self.playbin)
+#    self.pad = self.playbin.get_static_pad('sink')
 
     self.sc = SoundCloud()
 
@@ -66,29 +70,39 @@ class MainWindow:
     window = self.builder.get_object("window_main")
     window.show_all()
 
-#  def on_gst_message(self, bus, message):
+  def on_eos(self, bus, message):
+    self.play_next()
 #    print message.type
+
+  def play_previous(self):
+    i = self.model.iter_previous(self.current_iter)
+    self.activate_row(i)
+
+  def play_next(self):
+    i = self.model.iter_next(self.current_iter)
+    self.activate_row(i)
+
+  def activate_row(self, i):
+    if i != None:
+      tp = self.model.get_path(i)
+      self.treeview.row_activated(tp, self.builder.get_object("treeviewcolumn1"))
 
   def on_window_key_press_event(self, window, key):
     if key.state == Gdk.ModifierType.CONTROL_MASK:
       # Play/pause
       if key.keyval == Gdk.KEY_space:
-        if self.player.get_state()[1] == gst.STATE_PAUSED:
-          self.player.set_state(gst.STATE_PLAYING)
+        if self.pipeline.get_state(0)[1] == Gst.State.PAUSED:
+          self.pipeline.set_state(Gst.State.PLAYING)
         else:
-          self.player.set_state(gst.STATE_PAUSED)
+          self.pipeline.set_state(Gst.State.PAUSED)
 
       # Next song
       elif key.keyval == Gdk.KEY_rightarrow or key.keyval == 65363:
-        i = self.model.iter_next(self.current_iter)
-        tp = self.model.get_path(i)
-        self.treeview.row_activated(tp, self.builder.get_object("treeviewcolumn1"))
+        self.play_next()
 
       # Prev song
       elif key.keyval == Gdk.KEY_leftarrow or key.keyval == 65361:
-        i = self.model.iter_previous(self.current_iter)
-        tp = self.model.get_path(i)
-        self.treeview.row_activated(tp, self.builder.get_object("treeviewcolumn1"))
+        self.play_previous()
 
       # Focus on search
       elif key.keyval == Gdk.KEY_s:
@@ -108,11 +122,20 @@ class MainWindow:
       self.search(search_entry.get_text())
 
   def on_window_destroy(self, a):
-      self.player.set_state(gst.STATE_NULL)
+      self.pipeline.set_state(Gst.State.NULL)
       Gtk.main_quit()
 
+  def on_image_artwork_small_button_release_event(self, eventbox, eventbutton):
+      window = self.builder.get_object("window_artwork")
+      window.show_all()
+
+  def on_image_artwork_button_release_event(self, eventbox, eventbutton):
+      window = self.builder.get_object("window_artwork")
+      window.close()
+      
+
   def reset_image(self):
-      self.builder.get_object("image1").set_from_file("images/soundcloud_logo_small.png")
+      self.builder.get_object("image_artwork_small").set_from_file("images/soundcloud_logo_small.png")
 
   def reset_playing(self):
       self.builder.get_object("l_artist").set_text("")
@@ -156,49 +179,46 @@ class MainWindow:
       self.current_track_id = track_id
       url = self.sc.client.get(self.tracks[track_id].stream_url, allow_redirects=False)
 
-      self.player.set_state(gst.STATE_NULL)
-      self.player.set_property('uri', url.location)
+      self.pipeline.set_state(Gst.State.NULL)
+      self.playbin.set_property('uri', url.location)
       # Pause for now, so we can prepare to retrieve the state later
-      self.player.set_state(gst.STATE_PAUSED)
+      self.pipeline.set_state(Gst.State.PAUSED)
 
-      correct_states = [gst.STATE_PLAYING, gst.STATE_PAUSED]
+      correct_states = [Gst.State.PAUSED, Gst.State.PLAYING]
 
-      while (self.player.get_state()[1] not in correct_states):
+      while (self.pipeline.get_state(100)[1] not in correct_states):
         time.sleep(0.1)
 
-      self.player.set_state(gst.STATE_PLAYING)
+      self.pipeline.set_state(Gst.State.PLAYING)
   
       self.update_time()
 
   def update_image(self, pixbuf):
-      self.builder.get_object("image1").set_from_pixbuf(pixbuf)
+      self.builder.get_object("image_artwork_small").set_from_pixbuf(pixbuf)
 
   def update_label(self, delta):
       self.builder.get_object("l_length").set_text(str(delta))
 
   def update_time(self):
-    format = gst.Format(gst.FORMAT_TIME)
 
-    self.builder.get_object("l_length").set_text(str(datetime.timedelta(seconds=(0 / gst.SECOND))))
+    self.builder.get_object("l_length").set_text(str(datetime.timedelta(seconds=(0 / Gst.SECOND))))
 
-    while True:
+    while self.pipeline.get_state(100)[1] != Gst.State.NULL:
       try:
-        duration = self.player.query_position(format)[0]
+        duration = self.pipeline.query_position(Gst.Format.TIME)[1]
+        delta = datetime.timedelta(seconds=(duration / Gst.SECOND))
+        GObject.idle_add(self.update_label, delta)
+        time.sleep(0.1)
       except Exception as e:
+        print e
         # Whatever, it's expected
         break
 
-      delta = datetime.timedelta(seconds=(duration / gst.SECOND))
-  
-      GObject.idle_add(self.update_label, delta)
-
-      time.sleep(0.1)
-
+Gst.init(None)
 GObject.threads_init()
-#Gdk.threads_init()
 MainWindow()
 #GLib.threads_init()
-#Gdk.threads_init()
+Gdk.threads_init()
 Gdk.threads_enter()
 Gtk.main()
 Gdk.threads_leave()
