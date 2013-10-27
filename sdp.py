@@ -131,7 +131,7 @@ class MainWindow:
 
   def on_image_artwork_button_release_event(self, eventbox, eventbutton):
       window = self.builder.get_object("window_artwork")
-      window.close()
+      window.hide()
       
 
   def reset_image(self):
