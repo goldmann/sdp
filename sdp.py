@@ -21,7 +21,7 @@ from gi.repository import Gtk, Gdk, Gst, GLib, GdkPixbuf, GObject
 import logging
 import threading
 import time
-import sched
+import webbrowser
 import urllib2
 import datetime
 import sys
@@ -55,12 +55,9 @@ class MainWindow:
 
     self.bus = self.pipeline.get_bus()
     self.bus.add_signal_watch()
-#    self.bus.connect('message', self.on_gst_message)
-#    self.bus.connect('message::error', self.on_error)
     self.bus.connect('message::eos', self.on_eos)
 
     self.pipeline.add(self.playbin)
-#    self.pad = self.playbin.get_static_pad('sink')
 
     self.sc = SoundCloud()
 
@@ -72,7 +69,6 @@ class MainWindow:
 
   def on_eos(self, bus, message):
     self.play_next()
-#    print message.type
 
   def play_previous(self):
     i = self.model.iter_previous(self.current_iter)
@@ -115,7 +111,7 @@ class MainWindow:
 
     i = 0
     for t in self.tracks:
-      self.model.append([i, t.title, t.permalink_url])
+      self.model.append([i, t.user['username'], t.title])
       i+=1
 
   def on_search_song_activate(self, search_entry):
@@ -141,12 +137,31 @@ class MainWindow:
       self.builder.get_object("l_artist").set_text("")
       self.builder.get_object("l_title").set_text("")
 
+  def on_tv_songs_button_press(self, treeview, event):
+      # Right click
+      if event.button == 3:
+        x = int(event.x)
+        y = int(event.y)
+        time = event.time
+        pthinfo = treeview.get_path_at_pos(x, y)
+        if pthinfo is not None:
+          path, col, cellx, celly = pthinfo
+          treeview.grab_focus()
+          treeview.set_cursor( path, col, 0)
+          self.builder.get_object("tv_menu").popup(None, None, None, None, event.button, time)
+
+  def on_tv_menu_browser_activate(self, a):
+      path, column = self.treeview.get_cursor()
+      i = self.model.get_iter(path)
+      track_id = self.model.get_value(i, 0)
+      track = self.tracks[track_id]
+      webbrowser.open(track.permalink_url)
+
   def on_songs_row_activated(self, treeview, path, column):
-      model = treeview.get_model()
-      i = model.get_iter(path)
+      i = self.model.get_iter(path)
       self.current_iter = i
 
-      track_id = model.get_value(i, 0)
+      track_id = self.model.get_value(i, 0)
       track = self.tracks[track_id]
 
       self.log.debug("Preparing to play track '" + track.title + "' by '" + track.user['username'] + "'")
