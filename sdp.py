@@ -25,7 +25,6 @@ import webbrowser
 import urllib2
 import datetime
 import sys
-import gobject as g
 from threading import Timer
 
 from client import SoundCloud
@@ -166,8 +165,8 @@ class MainWindow:
 
       self.log.debug("Preparing to play track '" + track.title + "' by '" + track.user['username'] + "'")
 
-      self.builder.get_object("l_title").set_markup("<span size=\"large\" font_weight=\"bold\">" + g.markup_escape_text(track.title) + "</span>")
-      self.builder.get_object("l_artist").set_markup("<span size=\"large\">" + g.markup_escape_text(track.user['username']) + "</span>")
+      self.builder.get_object("l_title").set_markup("<span size=\"large\" font_weight=\"bold\">" + GObject.markup_escape_text(track.title).strip() + "</span>")
+      self.builder.get_object("l_artist").set_markup("<span size=\"large\">" + GObject.markup_escape_text(track.user['username']).strip() + "</span>")
 
       self.log.debug("Checking if track contains artwork...")
 
