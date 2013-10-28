@@ -100,7 +100,7 @@ class MainWindow:
         self.play_previous()
 
       # Focus on search
-      elif key.keyval == Gdk.KEY_s:
+      elif key.keyval == Gdk.KEY_f:
         self.builder.get_object("search_song").grab_focus()
 
   def search(self, term=""):
@@ -183,7 +183,13 @@ class MainWindow:
       th_play.start()
 
   def get_image(self, url):
-      response = urllib2.urlopen(url).read()
+      try:
+        response = urllib2.urlopen(url).read()
+      except Exception:
+        # Whatever
+        self.reset_image()
+        return False
+
       l = GdkPixbuf.PixbufLoader.new_with_type('jpeg')
       l.write(response)
       l.close()
@@ -205,7 +211,7 @@ class MainWindow:
 
       self.pipeline.set_state(Gst.State.PLAYING)
   
-      self.update_time()
+      self.update_time(track_id)
 
   def update_image(self, pixbuf):
       self.builder.get_object("image_artwork_small").set_from_pixbuf(pixbuf)
@@ -213,11 +219,11 @@ class MainWindow:
   def update_label(self, delta):
       self.builder.get_object("l_length").set_text(str(delta))
 
-  def update_time(self):
+  def update_time(self, track_id):
 
     self.builder.get_object("l_length").set_text(str(datetime.timedelta(seconds=(0 / Gst.SECOND))))
 
-    while self.pipeline.get_state(100)[1] != Gst.State.NULL:
+    while self.pipeline.get_state(100)[1] != Gst.State.NULL and self.current_track_id == track_id:
       try:
         duration = self.pipeline.query_position(Gst.Format.TIME)[1]
         delta = datetime.timedelta(seconds=(duration / Gst.SECOND))

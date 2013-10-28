@@ -9,9 +9,15 @@ class SoundCloud:
         return self.client
 
     def tracks(self, search):
-        return self.client.get('/tracks', limit=15, q=search, filter="streamable")
+        try:
+            return self.client.get('/tracks', limit=15, q=search, filter="streamable")
+        except Exception:
+            return None
 
     def user(self, id):
-        return self.client.get('/users/%s' % id)
+        try:
+            return self.client.get('/users/%s' % id)
+        except Exception:
+            return None
 
 
