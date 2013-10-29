@@ -18,8 +18,9 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from gi.repository import Gtk, Gdk, Gst, GLib, GdkPixbuf, GObject
+from Queue import Queue
 import logging
-import threading
+from threading import Thread
 import time
 import webbrowser
 import urllib2
@@ -62,6 +63,16 @@ class MainWindow:
 
     self.treeview = self.builder.get_object("tv_songs")
     self.model = self.treeview.get_model()
+
+    self.queue_artwork = Queue()
+    self.queue_player = Queue()
+
+    self.thread_artwork = Thread(target=self.worker_artwork,name="ArtworkThread")
+    self.thread_artwork.daemon = True
+    self.thread_artwork.start()
+
+#    self.thread_player = Thread(target=self.worker_player)
+#    self.thread_player.daemon = True
 
     window = self.builder.get_object("window_main")
     window.show_all()
@@ -118,6 +129,7 @@ class MainWindow:
 
   def on_window_destroy(self, a):
       self.pipeline.set_state(Gst.State.NULL)
+      #self.queue_artwork.join()
       Gtk.main_quit()
 
   def on_image_artwork_small_button_release_event(self, eventbox, eventbutton):
@@ -170,30 +182,11 @@ class MainWindow:
 
       self.log.debug("Checking if track contains artwork...")
 
-      if (track.artwork_url != None):
-        self.log.debug("Yes it does, will update the image")
-      
-        th_img = threading.Thread(target=self.get_image,args=(track.artwork_url,))
-        th_img.start()
-      else:
-        self.log.debug("No artwork this time")
-        self.reset_image()
+      # Update artwork (if available)
+      self.queue_artwork.put_nowait(track.artwork_url)
 
-      th_play = threading.Thread(target=self.play,args=(track_id,))
+      th_play = Thread(target=self.play,args=(track_id,))
       th_play.start()
-
-  def get_image(self, url):
-      try:
-        response = urllib2.urlopen(url).read()
-      except Exception:
-        # Whatever
-        self.reset_image()
-        return False
-
-      l = GdkPixbuf.PixbufLoader.new_with_type('jpeg')
-      l.write(response)
-      l.close()
-      GObject.idle_add(self.update_image, l.get_pixbuf())
 
   def play(self, track_id):
       self.current_track_id = track_id
@@ -218,6 +211,34 @@ class MainWindow:
 
   def update_label(self, delta):
       self.builder.get_object("l_length").set_text(str(delta))
+
+  def worker_artwork(self):
+      while True:
+        url = self.queue_artwork.get()
+
+        if (url != None):
+          # Get the url from the queue
+          self.log.debug("Yes it does, will update the image")
+
+          try:
+            response = urllib2.urlopen(url).read()
+          except Exception:
+            # Whatever
+            self.reset_image()
+            continue
+
+          l = GdkPixbuf.PixbufLoader.new_with_type('jpeg')
+          l.write(response)
+          l.close()
+          GObject.idle_add(self.update_image, l.get_pixbuf())
+        else:
+          self.log.debug("No artwork this time")
+          self.reset_image()
+
+        self.queue_artwork.task_done()
+
+  def worker_player():
+      pass
 
   def update_time(self, track_id):
 
